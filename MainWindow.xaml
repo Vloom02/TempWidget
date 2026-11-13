@@ -1,0 +1,231 @@
+﻿<Window x:Class="TempWidget.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Temperaturas" Icon="app.ico" Width="300" SizeToContent="Height" Left="-10000" Top="-10000"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False"
+        FontFamily="Segoe UI" Foreground="{DynamicResource TextBrush}"
+        MouseLeftButtonDown="Drag">
+    <!-- Every color comes from the current Theme (Theme.cs) through DynamicResource.
+         The window starts off-screen so it is not seen before the saved mode and position are applied. -->
+    <!-- Items are built in MainWindow.Menu.cs: the tray icon and the bar's "Opciones" button open this same menu. -->
+    <Window.ContextMenu>
+        <ContextMenu Foreground="{x:Static SystemColors.MenuTextBrush}"/>
+    </Window.ContextMenu>
+    <Window.Resources>
+        <ItemsPanelTemplate x:Key="CompactPanel"><StackPanel/></ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="BarPanel"><UniformGrid Rows="1"/></ItemsPanelTemplate>
+        <PathGeometry x:Key="Leaf" Figures="M2,38 C2,14 14,2 38,2 C38,26 26,38 2,38 Z M2,38 L38,2"/>
+
+        <Style x:Key="GlassButton" TargetType="ButtonBase">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <!-- Wide enough for "Estilo: Technozen", so the bar does not reflow when the style changes -->
+            <Setter Property="MinWidth" Value="118"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ButtonBase">
+                        <Border x:Name="B" CornerRadius="{DynamicResource ButtonCorner}" Background="{DynamicResource ButtonBrush}"
+                                BorderBrush="{DynamicResource ButtonEdgeBrush}" BorderThickness="1" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="Background" Value="{DynamicResource ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="ToggleButton.IsChecked" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="B" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The gauge ring takes its color from the reading's level -->
+        <Style x:Key="Ring" TargetType="Ellipse">
+            <Setter Property="Stroke" Value="{DynamicResource RingPlain}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Level}" Value="Cool"><Setter Property="Stroke" Value="{DynamicResource RingCool}"/></DataTrigger>
+                <DataTrigger Binding="{Binding Level}" Value="Warm"><Setter Property="Stroke" Value="{DynamicResource RingWarm}"/></DataTrigger>
+                <DataTrigger Binding="{Binding Level}" Value="Hot"><Setter Property="Stroke" Value="{DynamicResource RingHot}"/></DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <!-- The margin leaves room for the window's own shadow. -->
+    <Border x:Name="Shell" Margin="12" CornerRadius="18" BorderThickness="1.5"
+            BorderBrush="{DynamicResource EdgeBrush}" Background="{DynamicResource BackBrush}">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.45" Color="#0A141E"/>
+        </Border.Effect>
+        <Grid>
+            <!-- Glass highlight across the top (transparent in flat styles) -->
+            <Border Height="64" VerticalAlignment="Top" CornerRadius="16,16,40,40" IsHitTestVisible="False"
+                    Background="{DynamicResource GlossBrush}"/>
+
+            <!-- Decoration layers. The style shows the ones whose Tag it names; code clips them to the rounded corners. -->
+            <Grid x:Name="Decos" IsHitTestVisible="False">
+                <Canvas Tag="Bubbles">
+                    <Ellipse Width="54" Height="54" Canvas.Right="16" Canvas.Top="-14" Fill="{DynamicResource BubbleBrush}"/>
+                    <Ellipse Width="22" Height="22" Canvas.Right="76" Canvas.Top="20" Fill="{DynamicResource BubbleBrush}"/>
+                    <Ellipse Width="34" Height="34" Canvas.Left="-10" Canvas.Bottom="6" Fill="{DynamicResource BubbleBrush}"/>
+                    <Ellipse Width="13" Height="13" Canvas.Left="26" Canvas.Bottom="42" Fill="{DynamicResource BubbleBrush}"/>
+                </Canvas>
+
+                <Grid Tag="Waves" Height="34" VerticalAlignment="Bottom">
+                    <Path Stretch="Fill" Fill="#26FFFFFF" Data="M0,12 C30,0 50,0 80,12 S130,24 160,12 S210,0 240,12 V40 H0 Z"/>
+                    <Path Stretch="Fill" Fill="#22FFFFFF" Margin="0,8,0,0" Data="M0,10 C25,22 55,22 80,10 S135,-2 160,10 S215,22 240,10 V40 H0 Z"/>
+                </Grid>
+
+                <!-- Ribbons drawn on a 240 x 100 board that stretches with the window -->
+                <Viewbox Tag="Aurora" Stretch="Fill">
+                    <Canvas Width="240" Height="100">
+                        <Path Data="M0,34 C40,6 90,52 140,20 S220,2 240,24 L240,50 C200,30 150,70 100,46 S30,40 0,64 Z">
+                            <Path.Fill>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#007CFFCB" Offset="0"/>
+                                    <GradientStop Color="#A07CFFCB" Offset="0.5"/>
+                                    <GradientStop Color="#007CFFCB" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Path.Fill>
+                            <Path.Effect><BlurEffect Radius="10"/></Path.Effect>
+                        </Path>
+                        <Path Data="M0,8 C60,34 120,-2 240,16 L240,36 C150,18 80,52 0,28 Z" Fill="#58B07CFF">
+                            <Path.Effect><BlurEffect Radius="12"/></Path.Effect>
+                        </Path>
+                        <Path Data="M0,74 C70,52 150,96 240,66 L240,84 C160,108 70,70 0,92 Z" Fill="#4840C8FF">
+                            <Path.Effect><BlurEffect Radius="12"/></Path.Effect>
+                        </Path>
+                    </Canvas>
+                </Viewbox>
+
+                <Canvas Tag="Leaves">
+                    <Path Data="{StaticResource Leaf}" Stretch="Fill" Width="66" Height="66" Canvas.Right="-24" Canvas.Top="-28"
+                          Fill="#38FFFFFF" Stroke="#70FFFFFF" StrokeThickness="1"/>
+                    <Path Data="{StaticResource Leaf}" Stretch="Fill" Width="30" Height="30" Canvas.Right="50" Canvas.Top="-8"
+                          Fill="#30E8FF6A" Stroke="#70FFFFFF" StrokeThickness="1" RenderTransformOrigin="0.5,0.5">
+                        <Path.RenderTransform><RotateTransform Angle="-35"/></Path.RenderTransform>
+                    </Path>
+                    <Path Data="{StaticResource Leaf}" Stretch="Fill" Width="52" Height="52" Canvas.Left="-18" Canvas.Bottom="-18"
+                          Fill="#30FFFFFF" Stroke="#60FFFFFF" StrokeThickness="1" RenderTransformOrigin="0.5,0.5">
+                        <Path.RenderTransform><RotateTransform Angle="180"/></Path.RenderTransform>
+                    </Path>
+                </Canvas>
+
+                <!-- Solid shapes: they only peek in from the edges, so they never sit under text or buttons -->
+                <Canvas Tag="Metro" Opacity="0.9">
+                    <Ellipse Width="90" Height="90" Canvas.Right="-58" Canvas.Top="-58" Fill="#B6FF00"/>
+                    <Ellipse Width="44" Height="44" Canvas.Right="36" Canvas.Top="-28" Fill="#FF2D9B"/>
+                    <Ellipse Width="20" Height="20" Canvas.Right="90" Canvas.Top="-8" Fill="#FFD400"/>
+                    <Ellipse Width="46" Height="46" Canvas.Left="-20" Canvas.Bottom="-20" Stroke="White" StrokeThickness="6"/>
+                </Canvas>
+
+                <Canvas Tag="Zen">
+                    <Ellipse Width="70" Height="70" Canvas.Right="-20" Canvas.Top="-30" Stroke="#38506070" StrokeThickness="1.2"/>
+                    <Ellipse Width="130" Height="130" Canvas.Right="-50" Canvas.Top="-60" Stroke="#2C506070" StrokeThickness="1.2"/>
+                    <Ellipse Width="190" Height="190" Canvas.Right="-80" Canvas.Top="-90" Stroke="#20506070" StrokeThickness="1.2"/>
+                </Canvas>
+            </Grid>
+
+            <DockPanel x:Name="Body" Margin="13,10,13,13">
+                <TextBlock x:Name="TitleText" DockPanel.Dock="Top" Text="Temperaturas" FontSize="15" FontWeight="SemiBold" Effect="{DynamicResource TextGlow}"/>
+                <TextBlock x:Name="Hint" DockPanel.Dock="Bottom" Margin="2,8,2,0" FontSize="10.5" Opacity="0.95" TextWrapping="Wrap"/>
+
+                <!-- Controls of the wide bar -->
+                <UniformGrid x:Name="BarButtons" DockPanel.Dock="Right" Columns="3" Margin="8,6,0,0" VerticalAlignment="Center" Visibility="Collapsed">
+                    <Button Style="{StaticResource GlassButton}" Content="Compacto" Click="UseCompact" ToolTip="Volver a la tarjeta pequeña"/>
+                    <ToggleButton Style="{StaticResource GlassButton}" Content="Fijar arriba" Click="SaveToggles" ToolTip="Mantener por encima de las demás ventanas"
+                                  IsChecked="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                    <ToggleButton x:Name="AutoHide" Style="{StaticResource GlassButton}" Content="Ocultar sola" IsChecked="True" Click="SaveToggles"
+                                  ToolTip="Esconder la barra cuando el cursor se aleja; vuelve al tocar el borde superior de la pantalla"/>
+                    <Button x:Name="StyleButton" Style="{StaticResource GlassButton}" Content="Estilo" Click="NextStyle"
+                            ToolTip="Pasar al siguiente estilo (la lista completa está en el menú del clic derecho)"/>
+                    <Button Style="{StaticResource GlassButton}" Content="Opciones" Click="OpenOptions"
+                            ToolTip="Componentes, tamaño, unidades, alertas, registro, inicio con Windows…"/>
+                    <Button Style="{StaticResource GlassButton}" Content="Cerrar" Click="Exit"/>
+                </UniformGrid>
+
+                <ItemsControl x:Name="List" ItemsSource="{Binding Meters}" ItemsPanel="{StaticResource CompactPanel}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="4,6,4,0" Padding="9" CornerRadius="{DynamicResource CardCorner}" BorderThickness="1"
+                                    Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardEdgeBrush}"
+                                    ToolTip="{Binding Tip}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Orb with a ring that fills with the value -->
+                                    <Grid Width="62" Height="62">
+                                        <Ellipse Fill="{DynamicResource OrbBrush}"/>
+                                        <Ellipse Stroke="{DynamicResource TrackBrush}" StrokeThickness="6"/>
+                                        <Ellipse Style="{StaticResource Ring}" StrokeThickness="6" StrokeDashArray="{Binding Dash}"
+                                                 RenderTransformOrigin="0.5,0.5">
+                                            <Ellipse.RenderTransform>
+                                                <RotateTransform Angle="-90"/>
+                                            </Ellipse.RenderTransform>
+                                        </Ellipse>
+                                        <TextBlock Text="{Binding ValueText}" FontSize="16" FontWeight="Bold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Effect="{DynamicResource TextGlow}"/>
+                                    </Grid>
+
+                                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <DockPanel>
+                                            <TextBlock Text="{Binding Label}" FontSize="13" FontWeight="Bold" Effect="{DynamicResource TextGlow}"/>
+                                            <TextBlock Text="{Binding LoadText}" FontSize="10.5" Opacity="0.9" Visibility="{Binding LoadVis}"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="10.5" Opacity="0.9" TextTrimming="CharacterEllipsis"/>
+
+                                        <!-- Load bar -->
+                                        <Border Height="6" Margin="0,4,0,0" CornerRadius="3" Background="{DynamicResource GrooveBrush}" Visibility="{Binding LoadVis}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="{Binding LoadStar}"/>
+                                                    <ColumnDefinition Width="{Binding RestStar}"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border CornerRadius="3" Background="{DynamicResource FillBrush}"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Last minute of the ring's value -->
+                                        <Viewbox Height="26" Margin="0,5,0,0" Stretch="Fill">
+                                            <Canvas Width="150" Height="26" ClipToBounds="True">
+                                                <Polygon Points="{Binding Points}" StrokeThickness="1.2" StrokeLineJoin="Round"
+                                                         Stroke="{DynamicResource SparkStroke}" Fill="{DynamicResource SparkFill}"/>
+                                            </Canvas>
+                                        </Viewbox>
+                                    </StackPanel>
+
+                                    <!-- Extra readings, wide bar only -->
+                                    <Border Grid.Column="2" Margin="12,0,0,0" Padding="12,0,2,0" VerticalAlignment="Center"
+                                            BorderBrush="{DynamicResource CardEdgeBrush}" BorderThickness="1,0,0,0" Visibility="{Binding DetailsVis}">
+                                        <ItemsControl ItemsSource="{Binding BarDetails}" Width="176">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <DockPanel Margin="0,1">
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Value}" FontSize="11" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding Label}" FontSize="11" Opacity="0.9"/>
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>
